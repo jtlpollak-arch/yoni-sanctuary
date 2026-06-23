@@ -2,7 +2,7 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import '../services/particle_manager.dart';
+import '../services/particle_manager.dart' as pm;
 import '../widgets/sand_canvas.dart';
 import '../core/constants.dart';
 
@@ -15,15 +15,16 @@ class KineticSandScreen extends StatefulWidget {
 
 class _KineticSandScreenState extends State<KineticSandScreen> with SingleTickerProviderStateMixin {
   late AnimationController _ticker;
-  final ParticleManager _particleManager = ParticleManager();
+  final pm.ParticleManager _particleManager = pm.ParticleManager();
   final Random _random = Random();
 
   Offset _emitterPosition = const Offset(200, 50);
-  Offset _previousEmitterPosition = const Offset(200, 50); // שמירת מיקום היסטורי לאינטרפולציה
+  Offset _previousEmitterPosition = const Offset(200, 50);
   ui.Image? _particleTexture;
 
   bool _isEmitting = false;
   Color _currentSandColor = Colors.amber[200]!;
+  pm.MaterialType _currentMaterial = pm.MaterialType.sand;
 
   @override
   void initState() {
@@ -54,7 +55,6 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
       _spawnNewParticles();
       _particleManager.updateParticles(MediaQuery.sizeOf(context));
 
-      // לאחר סיום הפריים, המיקום הנוכחי הופך להיות המיקום ה"ישן" עבור הפריים הבא
       if (_isEmitting) {
         _previousEmitterPosition = _emitterPosition;
       }
@@ -65,9 +65,13 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
     setState(() {
       _isEmitting = true;
       _emitterPosition = position;
-      _previousEmitterPosition = position; // איפוס הנקודה ההיסטורית לתחילת המגע
+      _previousEmitterPosition = position;
 
-      _currentSandColor = Color.fromARGB(255, 150 + _random.nextInt(106), 150 + _random.nextInt(106), 150 + _random.nextInt(106));
+      if (_currentMaterial == pm.MaterialType.stone) {
+        _currentSandColor = Colors.grey[600]!;
+      } else {
+        _currentSandColor = Color.fromARGB(255, 150 + _random.nextInt(106), 150 + _random.nextInt(106), 150 + _random.nextInt(106));
+      }
     });
   }
 
@@ -90,15 +94,13 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
 
     int rate = AppConstants.getEmissionRate();
     for (int i = 0; i < rate; i++) {
-      // חישוב אינטרפולציה: מציאת הנקודה היחסית על הקו שבין המיקום הישן לחדש
       double t = (rate == 1) ? 1.0 : (i / (rate - 1));
       double interpX = ui.lerpDouble(_previousEmitterPosition.dx, _emitterPosition.dx, t)!;
       double interpY = ui.lerpDouble(_previousEmitterPosition.dy, _emitterPosition.dy, t)!;
 
-      // הוספת פיזור אקראי רך סביב הנקודה המחושבת למראה טבעי
       final center = Offset(interpX + (_random.nextDouble() * 20 - 10), interpY);
 
-      _particleManager.emitParticle(center, _currentSandColor);
+      _particleManager.emitParticle(center, _currentSandColor, _currentMaterial);
     }
   }
 
@@ -106,6 +108,30 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
   void dispose() {
     _ticker.dispose();
     super.dispose();
+  }
+
+  // פונקציית עזר ליצירת כפתורי החומרים (ממשק זמני לשלב זה)
+  Widget _buildMaterialButton(String title, pm.MaterialType type, Color color) {
+    bool isSelected = _currentMaterial == type;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentMaterial = type;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.4) : Colors.transparent,
+          border: Border.all(color: color, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          title,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
   }
 
   @override
@@ -119,16 +145,31 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        onPanDown: (details) => _startEmitting(details.localPosition),
-        onPanUpdate: (details) => _updateEmitterPosition(details.localPosition),
-        onPanEnd: (_) => _stopEmitting(),
-        onPanCancel: () => _stopEmitting(),
+      body: Stack(
+        children: [
+          // שכבת הקנבס והציור
+          GestureDetector(
+            onPanDown: (details) => _startEmitting(details.localPosition),
+            onPanUpdate: (details) => _updateEmitterPosition(details.localPosition),
+            onPanEnd: (_) => _stopEmitting(),
+            onPanCancel: () => _stopEmitting(),
+            child: CustomPaint(
+              painter: SandCanvas(manager: _particleManager, texture: _particleTexture!),
+              size: Size.infinite,
+            ),
+          ),
 
-        child: CustomPaint(
-          painter: SandCanvas(manager: _particleManager, texture: _particleTexture!),
-          size: Size.infinite,
-        ),
+          // שכבת הממשק הזמנית לבחירת חומרים
+          Positioned(
+            top: 50,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [_buildMaterialButton('חול', pm.MaterialType.sand, Colors.amber), const SizedBox(width: 10), _buildMaterialButton('אבן', pm.MaterialType.stone, Colors.grey)]),
+            ),
+          ),
+        ],
       ),
     );
   }
