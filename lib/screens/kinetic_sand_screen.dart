@@ -1,10 +1,11 @@
 // lib/screens/kinetic_sand_screen.dart
 import 'dart:math';
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
-import '../services/particle_manager.dart' as pm;
+import 'package:flutter/material.dart' hide MaterialType;
+import '../services/particle_manager.dart';
 import '../widgets/sand_canvas.dart';
 import '../core/constants.dart';
+import '../core/material_type.dart';
 
 class KineticSandScreen extends StatefulWidget {
   const KineticSandScreen({super.key});
@@ -15,7 +16,7 @@ class KineticSandScreen extends StatefulWidget {
 
 class _KineticSandScreenState extends State<KineticSandScreen> with SingleTickerProviderStateMixin {
   late AnimationController _ticker;
-  final pm.ParticleManager _particleManager = pm.ParticleManager();
+  final ParticleManager _particleManager = ParticleManager();
   final Random _random = Random();
 
   Offset _emitterPosition = const Offset(200, 50);
@@ -24,7 +25,7 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
 
   bool _isEmitting = false;
   Color _currentSandColor = Colors.amber[200]!;
-  pm.MaterialType _currentMaterial = pm.MaterialType.sand;
+  MaterialType _currentMaterial = MaterialType.kineticSand;
 
   @override
   void initState() {
@@ -67,8 +68,10 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
       _emitterPosition = position;
       _previousEmitterPosition = position;
 
-      if (_currentMaterial == pm.MaterialType.stone) {
+      if (_currentMaterial == MaterialType.stone) {
         _currentSandColor = Colors.grey[600]!;
+      } else if (_currentMaterial == MaterialType.drySand) {
+        _currentSandColor = Color.fromARGB(255, 200 + _random.nextInt(56), 150 + _random.nextInt(60), 50 + _random.nextInt(50));
       } else {
         _currentSandColor = Color.fromARGB(255, 150 + _random.nextInt(106), 150 + _random.nextInt(106), 150 + _random.nextInt(106));
       }
@@ -110,8 +113,7 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
     super.dispose();
   }
 
-  // פונקציית עזר ליצירת כפתורי החומרים (ממשק זמני לשלב זה)
-  Widget _buildMaterialButton(String title, pm.MaterialType type, Color color) {
+  Widget _buildMaterialButton(String title, MaterialType type, Color color) {
     bool isSelected = _currentMaterial == type;
     return GestureDetector(
       onTap: () {
@@ -147,7 +149,6 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // שכבת הקנבס והציור
           GestureDetector(
             onPanDown: (details) => _startEmitting(details.localPosition),
             onPanUpdate: (details) => _updateEmitterPosition(details.localPosition),
@@ -159,14 +160,34 @@ class _KineticSandScreenState extends State<KineticSandScreen> with SingleTicker
             ),
           ),
 
-          // שכבת הממשק הזמנית לבחירת חומרים
           Positioned(
             top: 50,
             right: 20,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [_buildMaterialButton('חול', pm.MaterialType.sand, Colors.amber), const SizedBox(width: 10), _buildMaterialButton('אבן', pm.MaterialType.stone, Colors.grey)]),
+              child: Row(children: [_buildMaterialButton('חול קינטי', MaterialType.kineticSand, Colors.amber), const SizedBox(width: 5), _buildMaterialButton('חול יבש', MaterialType.drySand, Colors.orange), const SizedBox(width: 5), _buildMaterialButton('אבן', MaterialType.stone, Colors.grey)]),
+            ),
+          ),
+
+          Positioned(
+            top: 50,
+            left: 20,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.redAccent, width: 2),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.white),
+                tooltip: 'נקה מסך',
+                onPressed: () {
+                  setState(() {
+                    _particleManager.reset();
+                  });
+                },
+              ),
             ),
           ),
         ],

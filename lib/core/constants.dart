@@ -1,5 +1,5 @@
 class AppConstants {
-  static int getMaxParticles() => 100000;
+  static int getMaxParticles() => 1000000;
   static int getEmissionRate() => 100; // פליטה מסיבית של חלקיקים בכל פריים
 }
 
